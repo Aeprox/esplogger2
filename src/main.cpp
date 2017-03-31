@@ -86,10 +86,16 @@ void loop() {
 
     update();
   }
+
   WiFi.disconnect(true);
   delay(50);
-  ESP.deepSleep(MEASUREMENTINTERVAL*1000000, WAKE_RF_DEFAULT);
 
+  if(rtc_mem.count >= NUMMEASUREMENTS-1){
+    ESP.deepSleep(MEASUREMENTINTERVAL*1000000, WAKE_RF_DEFAULT);
+  }
+  else{
+    ESP.deepSleep(MEASUREMENTINTERVAL*1000000, WAKE_RF_DISABLED);
+  }
   #else
   if ((WiFi.status() != WL_CONNECTED)){
     connectWifi();
