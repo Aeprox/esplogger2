@@ -170,14 +170,6 @@ void doMeasurements(){
   rtc_mem.vdd = vdd;
   rtc_mem.count = rtc_mem.count + 1;
 
-  Serial.println(rtc_mem.t);
-  Serial.println(rtc_mem.h);
-  Serial.println(rtc_mem.ir);
-  Serial.println(rtc_mem.full);
-  Serial.println(rtc_mem.lux);
-  Serial.println(rtc_mem.vdd);
-  Serial.println(rtc_mem.count);
-
   // write to RTC mem
   ESP.rtcUserMemoryWrite(0, (uint32_t*) &rtc_mem, sizeof(rtc_mem));
 }
@@ -198,6 +190,8 @@ void update(){
   mqttClient.publish(chnlBuffer,msgBuffer);
 
   Serial.print(data);
+
+  // give network some time to send data before proceding
   delay(1000);
 
   // set rtc to 0 for all fields and write to memory
