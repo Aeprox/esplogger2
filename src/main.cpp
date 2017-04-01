@@ -49,16 +49,14 @@ void update();
 void doMeasurements();
 void resetRTC();
 
+unsigned long timet = 0;
+
 void setup(void) {
+  timet = millis();
   Serial.begin(9600);
 
   dht.begin();
-
-  if (tsl.begin()) {
-   Serial.println("Found sensor");
-  } else {
-   Serial.println("No sensor?");
-  }
+  tsl.begin();
 
   tsl.setGain(TSL2561_GAIN_0X);
   tsl.setTiming(TSL2561_INTEGRATIONTIME_13MS);
@@ -90,7 +88,10 @@ void loop() {
   }
 
   WiFi.disconnect(true);
-  delay(50);
+
+  Serial.print("Done. Took a total of ");
+  Serial.print(millis()-timet);
+  Serial.println(" milliseconds");
 
   if(rtc_mem.count >= NUMMEASUREMENTS-1){
     ESP.deepSleep(MEASUREMENTINTERVAL*1000000, WAKE_RF_DEFAULT);
