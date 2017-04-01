@@ -237,12 +237,22 @@ void connectWifi() {
 }
 
 void reconnectMqtt(){
+  uint8_t attempts = 0;
   while (!mqttClient.connected()) {
-    Serial.print("Attempting MQTT connection...");
+    if(attempts > 10){
+      Serial.print("Could not connect to MQTT server. Restarting node.");
+      delay(50);
+      ESP.reset();
+      break;
+    }
+    Serial.printf("(%d) Attempting MQTT connection...", attempts);
     // Create a random client ID
     String clientId = "ESP8266Client-";
     clientId += String(random(0xffff), HEX);
     // Attempt to connect
+    if ((WiFi.status() != WL_CONNECTED)){
+      connectWifi();
+    }
     if (mqttClient.connect(clientId.c_str())) {
       Serial.println("connected");
     } else {
@@ -252,5 +262,7 @@ void reconnectMqtt(){
       // Wait 5 seconds before retrying
       delay(5000);
     }
+    attempts++;
   }
+
 }
