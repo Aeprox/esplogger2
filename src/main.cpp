@@ -66,9 +66,11 @@ void setup(void) {
   mqttClient.setServer(MQTTSERVER, 1883);
   mqttClient.setCallback(callback);
 
-  Serial.print(ESP.getResetReason());
+  // when NOT waking from deep sleep, reset RTC memory to 0 and wait for sensors to initialise
+  Serial.println(ESP.getResetReason());
   if (resetInfo.reason != REASON_DEEP_SLEEP_AWAKE){
     resetRTC();
+    delay(500);
   }
 }
 
