@@ -119,6 +119,7 @@ void loop() {
 }
 
 void doMeasurements(){
+  tsl.enable();
   float h = dht.readHumidity();
   // Read temperature as Celsius (the default)
   float t = dht.readTemperature();
@@ -143,6 +144,9 @@ void doMeasurements(){
   ir = lum >> 16;
   full = lum & 0xFFFF;
   uint32_t lux = tsl.calculateLux(full, ir);
+
+  //disable sensor
+  tsl.disable();
 
   Serial.print("IR: "); Serial.print(ir);   Serial.print("\t\t");
   Serial.print("Full: "); Serial.print(full);   Serial.print("\t");
