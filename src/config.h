@@ -13,7 +13,7 @@
 // defines for thingspeak connection
 #define MQTTSERVER "mqtt.thingspeak.com"
 #define CHANNELID "your channel ID"
-#define APIKEY  "our api key"
+#define APIKEY  "your api key"
 
 //update & measurement inverval (in seconds)
 #define MEASUREMENTINTERVAL 10
