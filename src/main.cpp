@@ -1,4 +1,5 @@
 #include "Arduino.h"
+#include "string.h"
 #include "ESP8266WiFi.h"
 #include "ESP8266HTTPClient.h"
 #include "PubSubClient.h"
@@ -16,6 +17,8 @@ extern struct rst_info resetInfo;
 }
 
 struct {
+  uint32_t mInt;
+  uint32_t mNum;
   float ir;
   float full;
   float lux;
@@ -30,11 +33,13 @@ ADC_MODE(ADC_VCC);
 
 // WiFi network and password
 WiFiClient espClient;
+WiFiClient espAdminClient;
 void connectWifi();
 
 // MQTT server & channel
 PubSubClient mqttClient(espClient);
-void reconnectMqtt();
+PubSubClient adminMqttClient(espAdminClient);
+void reconnectMqtt(PubSubClient &client);
 void callback(char* topic, byte* payload, unsigned int length);
 
 // DHT22 sensor pin & type declaration
@@ -45,6 +50,9 @@ TSL2561 tsl(TSL2561_ADDR_FLOAT, SDAPIN, SCLPIN);
 
 unsigned long lastMsg = 0;
 uint8_t measurements = 0;
+uint32_t measurementInterval = DEFAULTMEASUREMENTINTERVAL;
+uint8_t numMeasurements = DEFAULTNUMMEASUREMENTS;
+
 void update();
 void doMeasurements();
 void resetRTC();
@@ -63,56 +71,94 @@ void setup(void) {
 
   mqttClient.setServer(MQTTSERVER, 1883);
   mqttClient.setCallback(callback);
+  adminMqttClient.setServer(MQTTADMINSERVER, MQTTADMINSERVERPORT);
+  adminMqttClient.setCallback(callback);
 
   // when NOT waking from deep sleep, reset RTC memory to 0 and wait for sensors to initialise
   Serial.println(ESP.getResetReason());
   if (resetInfo.reason != REASON_DEEP_SLEEP_AWAKE){
     resetRTC();
-    delay(500);
+
+    if ((WiFi.status() != WL_CONNECTED)){
+      connectWifi();
+    }
+    if (!adminMqttClient.connected()) {
+      reconnectMqtt(adminMqttClient);
+    }
+
+    //need to run pubsubclient.loop a couple of times to handle subscribes
+    int i = 0;
+    while(i<=25){
+      adminMqttClient.loop();
+      delay(100);
+      i++;
+    }
+
+    WiFi.disconnect(true);
+  }
+  else{ //when waking from deep sleep, fetch config from RTC memory
+    ESP.rtcUserMemoryRead(0, (uint32_t*) &rtc_mem, sizeof(rtc_mem));
+
+    measurementInterval = rtc_mem.mInt;
+    numMeasurements = rtc_mem.mNum;
   }
 }
 
 void loop() {
   #ifdef SLEEP
   doMeasurements();
-  if(rtc_mem.count >= NUMMEASUREMENTS){
+  if(rtc_mem.count >= numMeasurements){
     if ((WiFi.status() != WL_CONNECTED)){
       connectWifi();
     }
     if (!mqttClient.connected()) {
-      reconnectMqtt();
+      reconnectMqtt(mqttClient);
     }
-    mqttClient.loop();
-
+    if (!adminMqttClient.connected()) {
+      reconnectMqtt(adminMqttClient);
+    }
     update();
-  }
 
-  WiFi.disconnect(true);
+    int i = 0;
+    while(i<=10){
+      adminMqttClient.loop();
+      mqttClient.loop();
+      delay(200);
+      i++;
+    }
+    WiFi.disconnect(true);
+  }
 
   Serial.print("Done. Took a total of ");
   Serial.print(millis()-timet);
   Serial.println(" milliseconds");
 
-  if(rtc_mem.count >= NUMMEASUREMENTS-1){
-    ESP.deepSleep(MEASUREMENTINTERVAL*1000000, WAKE_RF_DEFAULT);
+  if(rtc_mem.count >= numMeasurements-1){
+    ESP.deepSleep(measurementInterval*1000000, WAKE_RFCAL);
   }
   else{
-    ESP.deepSleep(MEASUREMENTINTERVAL*1000000, WAKE_RF_DISABLED);
+    ESP.deepSleep(measurementInterval*1000000, WAKE_RF_DISABLED);
   }
+
   #else
+
   if ((WiFi.status() != WL_CONNECTED)){
     connectWifi();
   }
   if (!mqttClient.connected()) {
-    reconnectMqtt();
+    reconnectMqtt(mqttClient);
+  }
+  if (!adminMqttClient.connected()) {
+    reconnectMqtt(adminMqttClient);
   }
   mqttClient.loop();
+  adminMqttClient.loop();
 
   unsigned long now = millis();
-  if (now - lastMsg > MEASUREMENTINTERVAL*1000) {
+  if (now - lastMsg > measurementInterval*1000) {
     doMeasurements();
     lastMsg = millis();
-    if(rtc_mem.count >= NUMMEASUREMENTS){
+    if(rtc_mem.count >= numMeasurements){
       update();
     }
   }
@@ -163,11 +209,11 @@ void doMeasurements(){
   ESP.rtcUserMemoryRead(0, (uint32_t*) &rtc_mem, sizeof(rtc_mem));
 
   // re-calculate average
-  rtc_mem.t = rtc_mem.t+(t/NUMMEASUREMENTS);
-  rtc_mem.h = rtc_mem.h+(h/NUMMEASUREMENTS);
-  rtc_mem.ir = rtc_mem.ir+((float)ir/NUMMEASUREMENTS);
-  rtc_mem.full = rtc_mem.full+((float)full/NUMMEASUREMENTS);
-  rtc_mem.lux = rtc_mem.lux+((float)lux/NUMMEASUREMENTS);
+  rtc_mem.t = rtc_mem.t+(t/numMeasurements);
+  rtc_mem.h = rtc_mem.h+(h/numMeasurements);
+  rtc_mem.ir = rtc_mem.ir+((float)ir/numMeasurements);
+  rtc_mem.full = rtc_mem.full+((float)full/numMeasurements);
+  rtc_mem.lux = rtc_mem.lux+((float)lux/numMeasurements);
   rtc_mem.vdd = vdd;
   rtc_mem.count = rtc_mem.count + 1;
 
@@ -186,9 +232,16 @@ void update(){
   String channel = String("channels/" + String(CHANNELID) +"/publish/"+String(APIKEY));
   length = channel.length();
   char chnlBuffer[length];
-
   channel.toCharArray(chnlBuffer, length+1);
+
   mqttClient.publish(chnlBuffer,msgBuffer);
+
+  if(adminMqttClient.publish("templogger/output", msgBuffer)){
+    Serial.println("Publish succeeded");
+  }
+  else{
+    Serial.println("Publish failed");
+  }
 
   Serial.print(data);
 
@@ -200,16 +253,41 @@ void update(){
 }
 
 void callback(char* topic, byte* payload, unsigned int length) {
+  std::string topicS = "";
+  String payloadS = "";
+
   Serial.print("Message arrived [");
   Serial.print(topic);
   Serial.print("] ");
   for (int i = 0; i < length; i++) {
     Serial.print((char)payload[i]);
+    payloadS += (char) payload[i];
   }
   Serial.println();
+  topicS = topic;
+
+  if(topicS.compare("templogger/admin/num") == 0){
+    int newNum = payloadS.toInt();
+    Serial.printf("Setting new number of measurements to %d ", newNum);
+    Serial.println();
+    numMeasurements = newNum;
+    rtc_mem.mNum = newNum;
+  }
+  else if (topicS.compare("templogger/admin/int") == 0){
+    int newInt = payloadS.toInt();
+    Serial.printf("Setting new measurement interval to %d ", newInt);
+    Serial.println();
+    measurementInterval = newInt;
+    rtc_mem.mInt = newInt;
+  }
+
+  ESP.rtcUserMemoryWrite(0, (uint32_t*) &rtc_mem, sizeof(rtc_mem));
+
 }
 
 void resetRTC(){
+  rtc_mem.mInt = DEFAULTMEASUREMENTINTERVAL;
+  rtc_mem.mNum = DEFAULTNUMMEASUREMENTS;
   rtc_mem.t = 0.0;
   rtc_mem.h = 0.0;
   rtc_mem.ir = 0;
@@ -233,9 +311,10 @@ void connectWifi() {
   Serial.println(WiFi.localIP());
 }
 
-void reconnectMqtt(){
+void reconnectMqtt(PubSubClient &client){
   uint8_t attempts = 0;
-  while (!mqttClient.connected()) {
+
+  while (!client.connected()) {
     if(attempts > 10){
       Serial.print("Could not connect to MQTT server. Restarting node.");
       delay(50);
@@ -250,16 +329,23 @@ void reconnectMqtt(){
     if ((WiFi.status() != WL_CONNECTED)){
       connectWifi();
     }
-    if (mqttClient.connect(clientId.c_str())) {
+    if (client.connect(clientId.c_str())) {
       Serial.println("connected");
     } else {
       Serial.print("failed, rc=");
-      Serial.print(mqttClient.state());
+      Serial.print(client.state());
       Serial.println(" try again in 5 seconds");
       // Wait 5 seconds before retrying
       delay(5000);
     }
     attempts++;
   }
-
+  if(&client == &adminMqttClient){
+    if(adminMqttClient.subscribe(MQTTADMINTOPIC)){
+      Serial.println("Subscribe succeeded");
+    }
+    else{
+      Serial.println("Subscribe failed");
+    }
+  }
 }

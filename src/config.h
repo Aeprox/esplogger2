@@ -10,16 +10,20 @@
 #define SDAPIN 14
 #define SCLPIN 12
 
-// defines for thingspeak connection
+// defines for thingspeak MQTT connection
 #define MQTTSERVER "mqtt.thingspeak.com"
 #define CHANNELID "your channel ID"
 #define APIKEY  "your api key"
 
-//update & measurement inverval (in seconds)
-#define MEASUREMENTINTERVAL 10
-//# of measurementintervals before update
-#define NUMMEASUREMENTS 3
+// defines MQTT admin connection
+#define MQTTADMINSERVER "192.168.1.252"
+#define MQTTADMINSERVERPORT 1883
+#define MQTTADMINTOPIC "templogger/admin"
 
+//update & measurement inverval (in seconds)
+#define DEFAULTMEASUREMENTINTERVAL 60
+//# of measurementintervals before update
+#define DEFAULTNUMMEASUREMENTS 5
 
 //uncomment to enable deepsleep
 //#define SLEEP
