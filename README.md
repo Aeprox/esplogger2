@@ -1,6 +1,6 @@
 # Esplogger2
 
-Rewrite of https://github.com/Aeprox/ESPLogger, using arduino framework (with platformio). Still using ESP8266 module, DHT22 and TSL2561 sensor to measure temperature, humidity and light intensity and periodically send this data to a server.
+Rewrite of https://github.com/Aeprox/ESPLogger, using arduino frameworkfor esp8266 (with [platformio](http://platformio.org/)). Still using the DHT22 and TSL2561 sensors to measure temperature, humidity and light intensity and periodically send this data to a server.
 
 Changes in rewrite:
 
@@ -33,7 +33,9 @@ This is where you enter your channel ID and API write key, which you find in you
 #define MQTTADMINSERVERPORT 1883
 #define MQTTADMINTOPIC "templogger/admin"
 ```
-Private server to send data to. Also subscribes to the configured topic. The module will look for messages published in this topic (and subtopics) with topic `templogger/admin/num` and `templogger/admin/int`and parse their values to update the measurement interval, see below.
+Private server to send data to. Data is published to templogger/output topic.
+
+Also subscribes to the configured topic. The module will look for messages published in this topic (and subtopics) with topic `templogger/admin/num` and `templogger/admin/int`and parse their values to update the measurement interval, see below.
 
 ``` c++
 //update & measurement inverval (in seconds)
