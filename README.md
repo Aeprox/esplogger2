@@ -19,14 +19,14 @@ Building is quite simple when you're using platformio to build this project, as 
 
 Configuring is done in [config.h](https://github.com/Aeprox/esplogger2/blob/master/src/config.h)
 
-```
+``` c++
 #define SSID "Your ssid"
 #define PASSWORD "Your network password"
 ```
 
 Enter your network name and password. 
 
-```
+``` c++
 // defines for thingspeak MQTT connection
 #define MQTTSERVER "mqtt.thingspeak.com"
 #define CHANNELID "your channel ID"
@@ -34,15 +34,15 @@ Enter your network name and password.
 ```
 This is where you enter your channel ID and API write key, which you find in your Thingspeak channel settings.
 
-```
+``` c++
 // defines MQTT admin connection
 #define MQTTADMINSERVER "192.168.1.252"
 #define MQTTADMINSERVERPORT 1883
 #define MQTTADMINTOPIC "templogger/admin"
 ```
-Private server to send data to. Also subscribes to the configured topic. The module will look for messages published in this topic (and subtopics) with topic `templogger/admin/num` and `templogger/admin/num`and parse their values to update the measurement interval, see below.
+Private server to send data to. Also subscribes to the configured topic. The module will look for messages published in this topic (and subtopics) with topic `templogger/admin/num` and `templogger/admin/int`and parse their values to update the measurement interval, see below.
 
-```
+``` c++
 //update & measurement inverval (in seconds)
 #define DEFAULTMEASUREMENTINTERVAL 60
 //# of measurementintervals before update
