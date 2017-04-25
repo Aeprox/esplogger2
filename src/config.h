@@ -26,4 +26,4 @@
 #define DEFAULTNUMMEASUREMENTS 5
 
 //uncomment to enable deepsleep
-//#define SLEEP
+#define SLEEP
